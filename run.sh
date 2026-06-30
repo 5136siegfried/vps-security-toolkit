@@ -86,6 +86,7 @@ collect_history
 collect_docker
 collect_docker_logs
 collect_nginx_attacks
+collect_bestpractices
 
 score_finalize
 
@@ -134,6 +135,7 @@ EOF
   render_cron_section
   render_docker_section
   render_nginx_section
+  render_bestpractices_section
   render_kernel_section
   render_fail2ban_section
   render_lynis_section
