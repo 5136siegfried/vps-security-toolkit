@@ -1,0 +1,28 @@
+# ================================================================
+#  docker-compose.yml — lancement local rapide du toolkit
+#
+#  Usage :
+#    cp .env.example .env   # puis éditer
+#    docker compose run --rm audit
+#    # rapport disponible dans ./out/vps-audit.html
+# ================================================================
+
+services:
+  audit:
+    build: .
+    image: vps-security-toolkit:local
+    pid: host
+    network_mode: host
+    privileged: false
+    volumes:
+      # Lecture seule du filesystem host pour les checks SUID/secrets/etc.
+      # NOTE: pour un audit complet du host (pas juste du conteneur),
+      # ce toolkit est conçu pour tourner DIRECTEMENT sur le VPS via run.sh,
+      # pas nécessairement en conteneur. Le mode conteneur ici sert surtout
+      # à scanner les images/containers Docker et fournir un environnement
+      # avec tous les outils préinstallés (lynis, trivy, rkhunter...).
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./out:/out
+    env_file:
+      - .env
+    command: ["--output", "/out/vps-audit.html"]
