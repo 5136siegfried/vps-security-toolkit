@@ -71,7 +71,7 @@ collect_docker_logs() {
 
   done < <(docker ps --format '{{.Names}}' 2>/dev/null)
 
-  [[ -z "$DOCKER_LOGS_SUMMARY" ]] && DOCKER_LOGS_SUMMARY="Aucun container actif"
+  DOCKER_LOGS_SUMMARY="${DOCKER_LOGS_SUMMARY:-Aucun container actif}"
 }
 
 render_docker_section() {
@@ -95,7 +95,7 @@ render_docker_section() {
     local non_json
     non_json=$(echo -e "$DOCKER_LOG_DRIVERS" | grep -vc 'json-file' || echo "0")
     if [[ "$non_json" -gt 0 ]]; then
-      alert "blue" "ℹ" "Certains conteneurs n'utilisent pas le driver json-file — passage recommandé pour un parsing de logs plus fiable"
+    non_json=$(echo -e "$DOCKER_LOG_DRIVERS" | { grep -vc "json-file" || true; })
     fi
     pre_block "$DOCKER_LOG_DRIVERS"
     if [[ -n "${TRIVY_RESULTS:-}" ]]; then

@@ -55,36 +55,67 @@ collect_ssh_config() {
 
 collect_users() {
   log "Utilisateurs..."
-  USERS_LIST=$(awk -F: '$7 !~ /nologin|false|sync|halt|shutdown/ && $3 >= 0 \
-    {print $1":"$3":"$4":"$6":"$7}' /etc/passwd 2>/dev/null)
-  UID0_OTHERS=$(awk -F: '$3==0 && $1!="root"{print $1}' /etc/passwd 2>/dev/null || echo "")
-  SUDO_MEMBERS=$(getent group sudo wheel 2>/dev/null | tr ':' ' ' | awk '{print $1": "$4}' || echo "N/A")
+  USERS_LIST=$(awk -F: '$7 !~ /nologin|false|sync|halt|shutdown/ && $3 >= 0 {print $1":"$3":"$4":"$6":"$7}' /etc/passwd 2>/dev/null || true)
+  UID0_OTHERS=$(awk -F: '$3==0 && $1!="root"{print $1}' /etc/passwd 2>/dev/null || true)
+  SUDO_MEMBERS=$(getent group sudo wheel 2>/dev/null | tr ':' ' ' | awk '{print $1": "$4}' || true)
   SSH_KEYS=""
   while IFS=: read -r user _ _ _ _ home _; do
     keyfile="${home}/.ssh/authorized_keys"
     if [[ -f "$keyfile" && -r "$keyfile" ]]; then
-      count=$(wc -l < "$keyfile" 2>/dev/null || echo "?")
-      SSH_KEYS+="${user}: ${count} clé(s)\n"
+      count=$( { grep -c 'ssh-' "$keyfile" || true; } 2>/dev/null)
+      SSH_KEYS="${SSH_KEYS}${user}: ${count:-0} cle(s)\n"
     fi
   done < /etc/passwd
-  [[ -z "$SSH_KEYS" ]] && SSH_KEYS="Aucune authorized_keys trouvée"
-  SUDOERS=$(grep -vE '^#|^$|^Defaults' /etc/sudoers 2>/dev/null | head -20 || echo "N/A (permission refusée)")
-  CRON_ROOT=$(crontab -l 2>/dev/null || echo "(vide)")
-  CRON_SYSD=$(ls -la /etc/cron.d/ 2>/dev/null || echo "(vide)")
+  SSH_KEYS="${SSH_KEYS:-Aucune authorized_keys trouvee}"
+  SUDOERS=$(grep -vE '^#|^$|^Defaults' /etc/sudoers 2>/dev/null | head -20 || true)
+  SUDOERS="${SUDOERS:-N/A}"
+  CRON_ROOT=$(crontab -l 2>/dev/null || true)
+  CRON_ROOT="${CRON_ROOT:-(vide)}"
+  CRON_SYSD=$(ls -la /etc/cron.d/ 2>/dev/null || true)
+  CRON_SYSD="${CRON_SYSD:-(vide)}"
   CRON_ALL=""
   for u in $(cut -d: -f1 /etc/passwd); do
-    ct=$(crontab -u "$u" -l 2>/dev/null | grep -v '^#' | grep -v '^$' || true)
-    [[ -n "$ct" ]] && CRON_ALL+="=== $u ===\n${ct}\n"
+    ct=$(crontab -u "$u" -l 2>/dev/null | { grep -v '^#' || true; } | { grep -v '^$' || true; })
+    if [ -n "$ct" ]; then
+      CRON_ALL="${CRON_ALL}=== ${u} ===${ct}
+"
+    fi
   done
-  [[ -z "$CRON_ALL" ]] && CRON_ALL="(aucune crontab utilisateur)"
+  CRON_ALL="${CRON_ALL:-(aucune crontab utilisateur)}"
 }
 
 collect_suid_sgid() {
   log "SUID/SGID..."
-  SUID_FILES=$(find / -xdev -perm -4000 -type f 2>/dev/null | sort || echo "N/A")
-  SGID_FILES=$(find / -xdev -perm -2000 -type f 2>/dev/null | sort | head -20 || echo "N/A")
-  WORLD_WRITABLE=$(find / -xdev -perm -0002 -not -type l -not -path '/proc/*' \
-    -not -path '/sys/*' 2>/dev/null | head -20 || echo "N/A")
+  SUID_FILES=$(timeout 30 find / \
+    -xdev \
+    -not -path '/proc/*' \
+    -not -path '/sys/*' \
+    -not -path '/run/*' \
+    -not -path '/dev/*' \
+    -not -path '/var/lib/containerd/*' \
+    -not -path '/var/lib/docker/*' \
+    -not -path '/snap/*' \
+    -perm -4000 -type f 2>/dev/null | sort || echo "N/A")
+  SGID_FILES=$(timeout 30 find / \
+    -xdev \
+    -not -path '/proc/*' \
+    -not -path '/sys/*' \
+    -not -path '/run/*' \
+    -not -path '/dev/*' \
+    -not -path '/var/lib/containerd/*' \
+    -not -path '/var/lib/docker/*' \
+    -not -path '/snap/*' \
+    -perm -2000 -type f 2>/dev/null | head -20 || echo "N/A")
+  WORLD_WRITABLE=$(timeout 30 find / \
+    -xdev \
+    -not -path '/proc/*' \
+    -not -path '/sys/*' \
+    -not -path '/run/*' \
+    -not -path '/dev/*' \
+    -not -path '/var/lib/containerd/*' \
+    -not -path '/var/lib/docker/*' \
+    -not -path '/snap/*' \
+    -perm -0002 -not -type l 2>/dev/null | head -20 || echo "N/A")
 }
 
 render_auth_section() {

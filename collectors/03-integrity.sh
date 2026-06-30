@@ -30,10 +30,10 @@ collect_certs() {
       if   [[ $days_left -le 7  ]]; then cert_status="fail"
       elif [[ $days_left -le 30 ]]; then cert_status="warn"
       else cert_status="ok"; fi
-      CERTS_INFO+="${domain}|${expiry}|${days_left}|${cert_status}\n"
+      [ -n "$domain" ] && CERTS_INFO="${CERTS_INFO}${domain}|${expiry}|${days_left}|${cert_status}\n"
     done < <(find "$dir" -name "*.pem" -o -name "*.crt" 2>/dev/null | head -15 | tr '\n' '\0')
   done
-  [[ -z "$CERTS_INFO" ]] && CERTS_INFO="none"
+  CERTS_INFO="${CERTS_INFO:-none}"
 }
 
 collect_kernel_params() {
@@ -83,7 +83,7 @@ collect_fail2ban() {
       detail=$(fail2ban-client status "$jail" 2>/dev/null || echo "N/A")
       FAIL2BAN_JAILS+="=== Jail: ${jail} ===\n${detail}\n\n"
     done
-    [[ -z "$FAIL2BAN_JAILS" ]] && FAIL2BAN_JAILS="Aucune jail active"
+    FAIL2BAN_JAILS="${FAIL2BAN_JAILS:-Aucune jail active}"
   fi
 }
 
@@ -118,7 +118,7 @@ collect_chkrootkit() {
     CHKROOTKIT_AVAILABLE=true
     log "  Scan chkrootkit..."
     CHKROOTKIT_OUTPUT=$(chkrootkit 2>/dev/null | grep -iE 'INFECTED|Vulnerable|not clean' | head -30 || echo "")
-    [[ -z "$CHKROOTKIT_OUTPUT" ]] && CHKROOTKIT_OUTPUT="Aucune infection détectée"
+    CHKROOTKIT_OUTPUT="${CHKROOTKIT_OUTPUT:-Aucune infection détectée}"
   fi
 }
 
@@ -129,7 +129,7 @@ collect_debsums() {
     DEBSUMS_AVAILABLE=true
     log "  Vérification debsums..."
     DEBSUMS_OUTPUT=$(debsums -s 2>/dev/null | head -30 || echo "")
-    [[ -z "$DEBSUMS_OUTPUT" ]] && DEBSUMS_OUTPUT="Tous les fichiers vérifiés OK"
+    DEBSUMS_OUTPUT="${DEBSUMS_OUTPUT:-Tous les fichiers vérifiés OK}"
   fi
 }
 
@@ -140,7 +140,7 @@ collect_aide() {
     AIDE_AVAILABLE=true
     if [[ -f /var/lib/aide/aide.db ]]; then
       AIDE_OUTPUT=$(aide --check 2>/dev/null | grep -E 'changed|added|removed' | head -30 || echo "")
-      [[ -z "$AIDE_OUTPUT" ]] && AIDE_OUTPUT="✓ Aucun changement détecté par AIDE"
+      AIDE_OUTPUT="${AIDE_OUTPUT:-✓ Aucun changement détecté par AIDE}"
     else
       AIDE_OUTPUT="Base AIDE non initialisée. Lancer : aide --init && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db"
     fi
@@ -181,7 +181,7 @@ collect_secrets() {
          -o -name "*.yaml" -o -name "*.yml" -o -name "*.json" -o -name "*.toml" \
          -o -name ".env*" \) 2>/dev/null | tr '\n' '\0')
   done
-  [[ -z "$SECRETS_FOUND" ]] && SECRETS_FOUND="Aucun pattern suspect détecté"
+  SECRETS_FOUND="${SECRETS_FOUND:-Aucun pattern suspect détecté}"
   ENV_SECRETS=$(env 2>/dev/null | grep -iE 'password|secret|token|key|api' \
     | sed -E 's/=.*/=[MASQUÉ]/' || echo "Aucune variable sensible dans env")
 }
